@@ -1,4 +1,6 @@
-# delta-input-FARM-builder
+# delta-input-builder
+
+*Versione italiana: [README.it.md](README.it.md)*
 
 An R tool that builds the **legacy-format inputs of the JRC DELTA Tool** from EEA observations and FARM model output.
 
