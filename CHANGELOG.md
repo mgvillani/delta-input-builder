@@ -7,6 +7,8 @@ Formato ispirato a [Keep a Changelog](https://keepachangelog.com/it/1.1.0/).
 
 Prima versione pubblica.
 
+README in inglese e in italiano
+
 ### Funzioni
 - Costruzione degli input legacy del DELTA Tool (`startup.ini`, `obs/`, `mod/`) da osservazioni EEA (parquet E1a), `DataExtract.csv`, NetCDF FARM e limiti ISTAT.
 - Abbinamento dei sampling point ai metadati in cascata (SPO, SPP, stessa stazione+codice+metodo, stazione+codice, stazione); valori mancanti completati con quelli degli altri record della stessa stazione.
