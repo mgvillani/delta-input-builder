@@ -1,0 +1,8 @@
+*.nc
+*.parquet
+DataExtract.csv
+dati/
+output/
+.Rhistory
+.RData
+Limiti*
