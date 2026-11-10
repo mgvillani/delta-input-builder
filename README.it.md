@@ -1,4 +1,4 @@
-# delta-input-FARM-builder
+# delta-input-builder
 
 *English version: [README.md](README.md)*
 
