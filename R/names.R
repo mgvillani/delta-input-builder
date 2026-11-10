@@ -1,7 +1,7 @@
-# Pulizia dei nomi per lo startup.ini: ASCII, nomi originali con spazi e "/"
-# ("Albiano d'Ivrea", "Reggio nell'Emilia"); accenti traslitterati ("Aglié" -> "Aglie").
-# Le sostituzioni sono scritte con escape \u per non dipendere dalla codifica
-# del file sorgente.
+# Name cleaning for startup.ini: ASCII, original names with spaces and "/"
+# ("Albiano d'Ivrea", "Reggio nell'Emilia"); accents transliterated ("Aglié" -> "Aglie").
+# The accented letters are mapped by Unicode code point, so the result does not depend on
+# the encoding of the source file.
 .ACCENT_MAP <- c(
   "à" = "a", "á" = "a", "â" = "a", "ä" = "a", "ã" = "a",
   "è" = "e", "é" = "e", "ê" = "e", "ë" = "e",
@@ -19,8 +19,8 @@
 
 .ACCENT_CP <- vapply(names(.ACCENT_MAP), utf8ToInt, integer(1), USE.NAMES = FALSE)
 
-# Lavora sui codepoint Unicode (utf8ToInt), quindi non dipende dal locale della
-# sessione (C, UTF-8, codepage Windows). Caratteri non mappati -> separatore.
+# Works on Unicode code points (utf8ToInt), so it does not depend on the session
+# locale (C, UTF-8, Windows codepage). Unmapped characters -> separator.
 .fold_ascii <- function(s) {
   cp <- utf8ToInt(s)
   if (!length(cp)) return("")
@@ -32,10 +32,10 @@
   paste(out, collapse = "")
 }
 
-# Nomi leggibili (Region, Siting): si rispettano i nomi originali, spazi e "/" compresi.
-# Accenti traslitterati, caratteri non ASCII non mappati e separatori dello startup
-# (";" "*") o altri caratteri problematici sostituiti da uno spazio; spazi multipli
-# ridotti. Restano lettere, cifre, spazio, "/", "-", "'", "." e ",".
+# Readable names (Region, Siting): the original names are kept, spaces and "/" included.
+# Accents are transliterated; unmapped non-ASCII characters, startup separators
+# (";" "*") and other problematic characters are replaced by a space; repeated spaces
+# are collapsed. Letters, digits, space, "/", "-", "'", "." and "," are kept.
 clean_name <- function(x, empty = "NA") {
   x <- enc2utf8(as.character(x))
   x[is.na(x)] <- ""

@@ -1,13 +1,13 @@
-# Lettura dei metadati EEA (DataExtract.csv) e delle osservazioni (parquet E1a).
+# Reading the EEA metadata (DataExtract.csv) and the observations (E1a parquet).
 
-# Tutti i record del DataExtract.csv (uno per Sampling Point Id + Process Id: lo stesso
-# SPO puo' comparire con piu' SPP). Nessun record viene scartato: `pol` e' il nome DELTA
-# se "Air Pollutant" e' nella colonna `eea` della tabella `pollutants` (vedi units.R),
-# NA altrimenti (specie non selezionata); `pol_eea` e' il nome EEA originale.
-# `code`/`method`/`sp_eoi` sono ricavati da "SPO.<EoI>_<codice>_<metodo>_<data>".
+# All the records of DataExtract.csv (one per Sampling Point Id + Process Id: the same
+# SPO may appear with several SPP). No record is dropped: `pol` is the DELTA name
+# if "Air Pollutant" is in the `eea` column of the `pollutants` table (see units.R),
+# NA otherwise (species not selected); `pol_eea` is the original EEA name.
+# `code`/`method`/`sp_eoi` are derived from "SPO.<EoI>_<code>_<method>_<date>".
 read_eea_metadata <- function(csv, pollutants) {
-  # Il CSV EEA e' UTF-8 (con qualche carattere gia' corrotto a monte): niente
-  # fileEncoding, che fa fallire la lettura al primo byte non valido.
+  # The EEA CSV is UTF-8 (with a few characters already corrupted upstream): no
+  # fileEncoding, which would make the read fail at the first invalid byte.
   raw <- utils::read.csv(csv, encoding = "UTF-8", colClasses = "character",
                          check.names = FALSE, na.strings = "")
   need <- c("Sampling Point Id", "Air Quality Station EoI Code",
@@ -15,7 +15,7 @@ read_eea_metadata <- function(csv, pollutants) {
             "Air Pollutant", "Longitude", "Latitude", "Altitude",
             "Air Quality Station Area", "Air Quality Station Type", "Timezone")
   miss <- setdiff(need, names(raw))
-  if (length(miss)) stop("Colonne mancanti nel CSV EEA: ", paste(miss, collapse = ", "))
+  if (length(miss)) stop("Missing columns in the EEA CSV: ", paste(miss, collapse = ", "))
 
   raw$pol <- pollutants$delta[match(raw[["Air Pollutant"]], pollutants$eea)]
   spp <- if ("Process Id" %in% names(raw)) raw[["Process Id"]] else rep(NA_character_, nrow(raw))
@@ -39,7 +39,7 @@ read_eea_metadata <- function(csv, pollutants) {
     lon = as.numeric(raw[["Longitude"]]),
     lat = as.numeric(raw[["Latitude"]]),
     alt = as.numeric(raw[["Altitude"]]),
-    area = tolower(raw[["Air Quality Station Area"]]),   # denominazione del DataExtract (es. rural-nearcity)
+    area = tolower(raw[["Air Quality Station Area"]]),   # designation of the DataExtract (e.g. rural-nearcity)
     type = tolower(raw[["Air Quality Station Type"]]),
     tz_offset = tz_off,
     muni = if ("Municipality" %in% names(raw)) raw[["Municipality"]] else NA_character_,
@@ -47,15 +47,15 @@ read_eea_metadata <- function(csv, pollutants) {
   )
 }
 
-# Cerca nel DataExtract il record di un sampling point delle osservazioni
-# ("SPO.<EoI>_<codice>_<metodo>_<data>"). In ordine:
-#   1. stesso SPO; 2. stesso SPP (Process Id); 3. stessa stazione, codice e metodo
-#   (la data o il metodo del processo possono essere cambiati); 4. stessa stazione e codice;
-#   5. solo la stazione: record costruito con i valori degli altri record della stazione e
-#      specie ricavata dal codice (vedi sotto).
-# Piu' righe candidate: quella con meno dati mancanti, poi l'ultima in ordine di SPP.
-# Ritorna NULL se la stazione non e' nel DataExtract, altrimenti una riga di `meta`
-# con `sp` = il sampling point delle osservazioni e `how` = criterio usato.
+# Looks up in the DataExtract the record of an observation sampling point
+# ("SPO.<EoI>_<code>_<method>_<date>"). In order:
+#   1. same SPO; 2. same SPP (Process Id); 3. same station, code and method
+#      (the date or the method of the process may have changed); 4. same station and code;
+#   5. station only: record built with the values of the other records of the station and
+#      species taken from the code (see below).
+# Several candidate rows: the one with fewer missing values, then the last in SPP order.
+# Returns NULL if the station is not in the DataExtract, otherwise a row of `meta`
+# with `sp` = the observation sampling point and `how` = the criterion used.
 match_sampling_point <- function(sp, meta) {
   m <- regmatches(sp, regexec("^SP[OP]\\.([^_]+)_([^_]+)_(.*)$", sp))[[1]]
   if (length(m) != 4) return(NULL)
@@ -75,13 +75,13 @@ match_sampling_point <- function(sp, meta) {
   i <- which(meta$spp %in% c(sp, sub("^SPO\\.", "SPP.", sp)))
   if (length(i)) return(pick(i, "SPP"))
   i <- which(st & meta$code %in% code & meta$method %in% method)
-  if (length(i)) return(pick(i, "stessa stazione, codice e metodo"))
+  if (length(i)) return(pick(i, "same station, code and method"))
   i <- which(st & meta$code %in% code)
-  if (length(i)) return(pick(i, "stessa stazione e codice"))
+  if (length(i)) return(pick(i, "same station and code"))
   i <- which(st)
   if (!length(i)) return(NULL)
-  r <- pick(i, "solo stazione")
-  # specie dal codice, come nel resto del DataExtract
+  r <- pick(i, "station only")
+  # species from the code, as in the rest of the DataExtract
   k <- which(meta$code %in% code)
   r$code <- code
   r$pol <- if (length(k)) meta$pol[k[1]] else NA_character_
@@ -92,42 +92,42 @@ match_sampling_point <- function(sp, meta) {
 read_obs_file <- function(f) {
   if (grepl("\\.parquet$", f, ignore.case = TRUE)) {
     if (!requireNamespace("arrow", quietly = TRUE)) {
-      stop("Per leggere i file parquet serve il pacchetto 'arrow'.")
+      stop("The 'arrow' package is required to read parquet files.")
     }
     as.data.frame(arrow::read_parquet(f))
   } else {
-    utils::read.csv(f, stringsAsFactors = FALSE)  # export CSV con le stesse colonne
+    utils::read.csv(f, stringsAsFactors = FALSE)  # CSV export with the same columns
   }
 }
 
-# Orologio "a muro" come POSIXct UTC. Il numero salvato nel parquet E' l'orologio (nessun fuso):
-# se l'oggetto non ha fuso (tzone NULL o ""), va letto in UTC e NON nel fuso della sessione
-# R (es. TZ=Europe/Rome, che aggiungerebbe 1 ora d'inverno e 2 d'estate); se ha un fuso
-# esplicito, si legge l'orologio in quel fuso.
+# Wall-clock time as POSIXct UTC. The number stored in the parquet IS the clock (no zone):
+# if the object has no time zone (tzone NULL or ""), it must be read in UTC and NOT in the
+# R session zone (e.g. TZ=Europe/Rome, which would add 1 hour in winter and 2 in summer); if it
+# has an explicit zone, the clock is read in that zone.
 .naive_utc <- function(x) {
-  if (is.character(x)) return(as.POSIXct(x, tz = "UTC"))  # export CSV
+  if (is.character(x)) return(as.POSIXct(x, tz = "UTC"))  # CSV export
   tz <- attr(x, "tzone")
   if (is.null(tz) || !nzchar(tz[1])) tz <- "UTC"
   as.POSIXct(format(x, "%Y-%m-%d %H:%M:%S", tz = tz[1]), tz = "UTC")
 }
 
-# Serie oraria UTC da un parquet EEA.
-#  - AggType "hour": il valore va all'ora di inizio (Start).
-#  - AggType "day" e "var": il valore e' costante su tutto l'intervallo
-#    [Start, End) e viene ripetuto su ogni ora dell'intervallo, qualunque ne
-#    sia la lunghezza (giorno, settimana, ...: benzene, Pb, Cd, ...).
-#  - Altri AggType: ignorati con avviso.
-# Start/End sono ora locale della stazione (fuso fisso, es. UTC+01): si
-# sottrae tz_offset per ottenere UTC.
+# Hourly UTC series from an EEA parquet.
+#  - AggType "hour": the value goes to the start hour (Start).
+#  - AggType "day" and "var": the value is constant over the whole interval
+#    [Start, End) and is repeated on every hour of the interval, whatever its
+#    length (day, week, ...: benzene, Pb, Cd, ...).
+#  - Other AggType: ignored with a warning.
+# Start/End are local station time (fixed zone, e.g. UTC+01): tz_offset is
+# subtracted to get UTC.
 obs_to_hourly <- function(d, tz_offset, valid_codes, factor) {
   start <- .naive_utc(d$Start)
   end <- .naive_utc(d$End)
   val <- as.numeric(d$Value)
   ok <- !is.na(val) & val > -900 & d$Validity %in% valid_codes
-  val <- val * factor   # conversione di unita' (dopo aver escluso -9999); factor: scalare o per riga
+  val <- val * factor   # unit conversion (after excluding -9999); factor: scalar or per row
   agg <- tolower(d$AggType)
   other <- setdiff(unique(agg), c("hour", "day", "var"))
-  if (length(other)) warning("AggType non gestito, ignorato: ", paste(other, collapse = ", "))
+  if (length(other)) warning("AggType not handled, ignored: ", paste(other, collapse = ", "))
 
   shift <- tz_offset * 3600
   h <- ok & agg == "hour"
@@ -145,13 +145,13 @@ obs_to_hourly <- function(d, tz_offset, valid_codes, factor) {
   out[!duplicated(out$time), , drop = FALSE]
 }
 
-# I valori dei metadati EEA si lasciano come sono, record per record (la stessa stazione
-# puo' avere coordinate, tipo o area diversi tra i suoi sampling point, e lo startup li
-# riporta cosi'). SOLO dove il dato manca (NA) si usa il valore degli altri record della
-# stessa stazione (EoI): per ogni gruppo di colonne `cols` (insieme, es. lon+lat), quello
-# sostenuto da piu' ore di dati validi (somma di `cov`); a parita' il primo in ordine
-# alfabetico. Un record con tutti i valori presenti non viene mai toccato.
-# `tab` deve avere `eoi` e `cov`. Ritorna la tabella e (attributo "filled") gli eoi toccati.
+# EEA metadata values are left as they are, record by record (the same station
+# may have different coordinates, type or area across its sampling points, and the startup
+# reports them as such). ONLY where a value is missing (NA) the value of the other records of
+# the same station (EoI) is used: for each group of columns `cols` (together, e.g. lon+lat),
+# the one supported by the most hours of valid data (sum of `cov`); for ties the first in
+# alphabetical order. A record with all values present is never touched.
+# `tab` must have `eoi` and `cov`. Returns the table and (attribute "filled") the EoIs touched.
 fill_missing_by_station <- function(tab, cols) {
   filled <- character()
   for (idx in split(seq_len(nrow(tab)), tab$eoi)) {

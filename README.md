@@ -1,4 +1,4 @@
-# delta-input-FARM-builder
+# delta-input-builder
 
 *Versione italiana: [README.it.md](README.it.md)*
 
@@ -18,8 +18,6 @@ An R tool that builds the **legacy-format inputs of the JRC DELTA Tool** from EE
 - `mod/<station>.csv`: modelled data in the grid cell of that station, with the **same file name** as in `obs/`.
 
 > **Use at your own risk.** This software is provided "as is", without warranty of any kind and without support (see `LICENSE`, MIT). Users are solely responsible for the results: always check the outputs, as described in step 5, before using them in any assessment. The package was developed with the help of AI tools. It is not an official product of the JRC or of the DELTA Tool.
->
-> The messages printed by the scripts (warnings, discarded-station report, errors) are currently in **Italian**; the tables below give their meaning in English.
 
 ---
 
@@ -27,13 +25,13 @@ An R tool that builds the **legacy-format inputs of the JRC DELTA Tool** from EE
 
 ### Step 1 - Put the data in the right folders
 
-Download or clone this repository. Inside the `delta-input-builder` folder create a `dati` folder (the name is used by the example script) laid out like this:
+Download or clone this repository. Inside the `delta-input-builder` folder create a `data` folder (the name used by the example script) laid out like this:
 
 ```
 delta-input-builder/
   R/                       (the code: do not edit)
   run_example.R            (the file you will edit)
-  dati/
+  data/
     eea_parquet/           all the EEA observation .parquet files
     farm/                  all the FARM NetCDF files
     DataExtract.csv        EEA station metadata
@@ -44,7 +42,7 @@ delta-input-builder/
 
 **ISTAT boundaries are required.** The script reads each station's region and municipality from them and stops with an error without them. Put the zip downloaded from ISTAT in `istat/` (no need to unzip it), or the already extracted folders (`Com01012023/`, `Reg01012023/`, ...). ISTAT publishes a new edition every year and the folder may contain as many as you like: the script uses the one **for `year`** (recognised from the date in the name, e.g. `Limiti01012023.zip` = 2023). If that year is missing it uses the latest earlier one (or, failing that, the oldest available) and prints a warning. Set `istat_year` to force another edition.
 
-`dati/` is already excluded by Git (see `.gitignore`): data never ends up in the repository.
+`data/` is already excluded by Git (see `.gitignore`, which also excludes `output/` and the data file types): data never ends up in the repository.
 
 ### Step 2 - Install the R packages (once)
 
@@ -64,12 +62,12 @@ All parameters are set **in one place: the top of `run_example.R`**. The code in
 
 ```r
 ## EEA observations
-obs_dir     <- "dati/eea_parquet"
+obs_dir     <- "data/eea_parquet"
 obs_pattern <- "\\.parquet$"               # regex on the observation file names
-meta_csv    <- "dati/DataExtract.csv"
+meta_csv    <- "data/DataExtract.csv"
 
 ## Model (concentration files)
-model_dir      <- "dati/farm"
+model_dir      <- "data/farm"
 model_pattern  <- "^conc_.*\\.nc$"         # regex on the model file names
 model_version  <- NULL                      # e.g. "g2": text the file name must contain
 model_grid     <- "lonlat"                  # "utm" (x,y in km) or "lonlat" (degrees)
@@ -80,7 +78,7 @@ utm_lon0       <- 9                         # only for model_grid = "utm"
 model_interp   <- "bilinear"                # "nearest" or "bilinear"
 
 ## ISTAT boundaries (required)
-istat_dir        <- "dati/istat"
+istat_dir        <- "data/istat"
 istat_year       <- NULL                    # NULL = edition of `year`
 istat_max_dist_m <- 2000
 comune_col       <- "COMUNE"
@@ -98,7 +96,7 @@ Further down the same file, the call to `build_delta_inputs(...)` passes these v
 Check in particular:
 
 - `year`: the year of your data;
-- the paths: if you followed step 1 they are already right. On Windows always write `/`, never `\` (e.g. `"C:/Users/name/dati/farm"`);
+- the paths: if you followed step 1 they are already right. On Windows always write `/`, never `\` (e.g. `"C:/Users/name/data/farm"`);
 - `model_pattern` / `model_version`: choose which concentration files are read;
 - `istat_dir`: the ISTAT folder of step 1. It cannot be removed;
 - `tz_offset <- 1`: **all** output files are in UTC+1. Write `0` for UTC.
@@ -125,7 +123,7 @@ or from a terminal in the same folder: `Rscript run_example.R`.
 
 ### Step 5 - Check the results
 
-1. **Warnings**: they are printed at the end in an `AVVISI` block and saved in full in `avvisi.txt` in the output folder (see "What appears on screen").
+1. **Warnings**: they are printed at the end in a `WARNINGS` block and saved in full in `warnings.txt` in the output folder (see "What appears on screen").
 2. **Output folder** (e.g. `output/2023/`): it must contain `startup.ini`, `obs/` and `mod/`, with identical file names in `obs/` and `mod/`.
 3. **Any file**: open it. The first line is `year;month;day;hour;NO2;PM10;...`. The value `-999` means "missing".
 4. **Startup**: in `startup.ini` check that region, municipality and `GMTLag` are as expected.
@@ -269,7 +267,7 @@ EEA observations are naive local clock times in fixed UTC+1 (no daylight saving)
 | `model_version` | text the concentration file name must contain, to choose a model version/run when several are in the folder; `NULL` = no filter. Combined with `model_pattern` |
 | `out_label` | subfolder of `out_dir` for the output (see above) |
 | `startup_name` | name of the startup file (`startup.ini`) |
-| `discarded_name`, `warnings_name` | names of the report files in the output folder: discarded stations (`stazioni_scartate.csv`) and full warnings (`avvisi.txt`) |
+| `discarded_name`, `warnings_name` | names of the report files in the output folder: discarded stations (`discarded_stations.csv`) and full warnings (`warnings.txt`) |
 
 ## Pollutants, names and units
 
@@ -279,8 +277,8 @@ You are not limited to NO2, O3, PM10, PM25: each pollutant is **a row** of the `
 
 | Column | Meaning | How to find it |
 |---|---|---|
-| `eea` | name in `Air Pollutant` of `DataExtract.csv`, identical (e.g. `PM2.5`, `C6H6`, `BaP in PM10`, `NOX as NO2`) | `list_eea_pollutants("dati/DataExtract.csv")` lists all names with the number of sampling points |
-| `farm` | variable name in the NetCDF (e.g. `PM25`) | `list_model_variables("dati/farm", "^conc_.*\\.nc$", NULL)` lists variables, units and dimensions |
+| `eea` | name in `Air Pollutant` of `DataExtract.csv`, identical (e.g. `PM2.5`, `C6H6`, `BaP in PM10`, `NOX as NO2`) | `list_eea_pollutants("data/DataExtract.csv")` lists all names with the number of sampling points |
+| `farm` | variable name in the NetCDF (e.g. `PM25`) | `list_model_variables("data/farm", "^conc_.*\\.nc$", NULL)` lists variables, units and dimensions |
 | `delta` | the name you want in the startup and CSV files | only letters and digits, starting with a letter: no spaces, `_`, `;`, `*`, `.` (e.g. `PM2.5` becomes `PM25`, `BaP in PM10` becomes `BaP`). The code stops if the name is invalid |
 
 **Species selection.** The table may hold all the species you need (in the example: SO2, CO, NOX, NO2, O3, PM10, PM25, Pb, As, BaP, Cd, Ni, C6H6) and in each run you choose which to prepare with `species`: `species <- c("NO2", "PM10")` prepares only those two, `species <- NULL` prepares all. A name that is not in the table stops the script with an error. With a selection, the automatic output folder name includes the species (e.g. `output/2023_NO2-PM10/`), so different selections do not overwrite each other. NOX stays in the table of the example but is excluded through `species`, as DELTA does not support it.
@@ -298,87 +296,97 @@ Conversion is **automatic** for mass-per-m3 units (kg, g, mg, ug, ng, pg; also `
 
 ## What appears on screen
 
-The script prints three kinds of lines (in Italian). Example with synthetic test data:
+The script prints three kinds of lines. Example with synthetic test data:
 
 ```
-Limiti ISTAT: edizione 2023
-Specie: NO2, O3, PM10
-Unita' osservazioni PM10: ug.m-3 -> ugm-3
-Osservazioni: 4 file, 0 saltati, 4 sampling point con dati validi nel periodo
-Unita' modello NO2 (c_NO2): ug/m3 -> ugm-3
+ISTAT boundaries: edition 2023
+Species: NO2, O3, PM10
+Observation units PM10: ug.m-3 -> ugm-3
+Observations: 4 files, 0 skipped, 4 sampling points with valid data in the period
+Model units NO2 (c_NO2): ug/m3 -> ugm-3
 Output in: output/2023_20230101-20230102
-Fatto: 2 file di stazione (1 stazioni EEA) per 48 ore, specie: NO2, PM10
+Done: 2 station files (1 EEA stations) for 48 hours, species: NO2, PM10
 ```
 
-**1. Informational messages** (no action needed; they let you check the script did what you expect):
+**1. Informational messages** (no action needed; they let you check that the script did what you expect):
 
 | Line starts with | Meaning |
 |---|---|
-| `Limiti ISTAT: edizione ...` | ISTAT edition used (that of `year`, or `istat_year`) |
-| `Specie: ...` | species that will be prepared |
-| `Unita' osservazioni ...` | unit found in the parquet files and output unit; the factor is shown if the conversion is not 1 |
-| `Osservazioni: N file, M saltati, K sampling point ...` | files read; "skipped" = parquet whose sampling point is not in `DataExtract.csv` (with a warning); last number = sampling points with at least one valid value in the period |
-| `Dati mancanti nei metadati, completati ...` | stations with empty cells in `DataExtract.csv` completed from other records of the same station |
-| `Unita' modello ...` | NetCDF variable, its unit and the output unit |
+| `ISTAT boundaries: edition ...` | ISTAT edition used (that of `year`, or `istat_year`) |
+| `Species: ...` | species that will be prepared |
+| `Observation units ...` | unit found in the parquet files and output unit; the factor is shown if the conversion is not 1 |
+| `Observations: N files, M skipped, K sampling points ...` | files read; "skipped" = sampling points not in `DataExtract.csv` (with a warning) or of non-selected species; last number = sampling points with at least one valid value in the period |
+| `Missing metadata, filled in from the same station: ...` | stations with empty cells in `DataExtract.csv` completed from other records of the same station |
+| `Model units ...` | NetCDF variable, its unit and the output unit |
 | `Output in: ...` | folder where `startup.ini`, `obs/` and `mod/` were written |
-| `Specie senza osservazioni ...` | species in the table with no observed data: not written |
-| `Fatto: ...` | final summary: files written, distinct EEA stations, hours per file, species written |
+| `Species without observations ...` | species in the table with no observed data: not written |
+| `Done: ...` | final summary: files written, distinct EEA stations, hours per file, species written |
 
-**2. Warnings** (`AVVISI`): something was discarded or modified but the script went on. They are printed in full at the end and **all** saved in `avvisi.txt` in the output folder. The most common:
+**2. Warnings** (`WARNINGS`): something was discarded or modified but the script went on. They are printed in full at the end and **all** saved in `warnings.txt` in the output folder. The most common:
 
-| Warning (Italian) | Meaning |
+| Warning starts with | Meaning |
 |---|---|
-| `Sampling point non in metadati ... saltato` | that parquet is not in `DataExtract.csv` (or is a species not in the table): not used |
-| `Variabili assenti nei NetCDF, specie scartate` | the model has no variable for those species (`farm` column) |
-| `Specie senza nessun sampling point nei metadati EEA` | the `eea` name does not exist in `DataExtract.csv` |
-| `File fuori dalla griglia FARM, scartati` | the station is outside the model domain |
-| `File a piu' di ... m da ogni comune ISTAT, scartati` | the station is in no municipality (threshold `istat_max_dist_m`) |
-| `File senza coordinate nei metadati, scartati` | lon/lat empty and no other record of the station has them |
-| `Station Code duplicato ... aggiunto l'EoI` | same `Nat Code` in two EoI stations: the EoI is appended |
-| `N ore su M senza modellato: scritte come -999` | model files are missing for part of the period |
-| `Molte ore compaiono in piu' file ...` | several versions of the same period in the model folder: use `model_version` or `model_pattern` |
-| `Nessuna edizione ISTAT del ...: uso l'edizione ...` | the ISTAT edition of the requested year is missing |
-| `AggType non gestito, ignorato` | EEA aggregation type other than `hour`, `day`, `var`: ignored |
-| `Colonna Unit assente in ...` | the parquet has no units: no conversion, set `obs_factor` if needed |
+| `Station not in the metadata, skipped` | that parquet's station EoI code is not in `DataExtract.csv`: not used |
+| `Variables missing in the NetCDF files, species dropped` | the model has no variable for those species (`farm` column) |
+| `Species with no sampling point in the EEA metadata` | the `eea` name does not exist in `DataExtract.csv` |
+| `Files outside the FARM grid, dropped` | the station is outside the model domain |
+| `Files more than ... m from any ISTAT municipality, dropped` | the station is in no municipality (threshold `istat_max_dist_m`) |
+| `Files without coordinates in the metadata, dropped` | lon/lat empty and no other record of the station has them |
+| `Duplicate Station Code ... EoI appended` | same `Nat Code` in two EoI stations: the EoI is appended |
+| `N of M hours without model data: written as -999` | model files are missing for part of the period |
+| `Many hours appear in several files ...` | several versions of the same period in the model folder: use `model_version` or `model_pattern` |
+| `No ISTAT edition for ...: using edition ...` | the ISTAT edition of the requested year is missing |
+| `AggType not handled, ignored` | EEA aggregation type other than `hour`, `day`, `var`: ignored |
+| `Unit column missing in ...` | the parquet has no units: no conversion, set `obs_factor` if needed |
+| `N sampling points matched by '...'` | the match in `DataExtract.csv` was not exact on the SPO (see "Matching observations to DataExtract.csv") |
 
-**3. Discarded stations.** After the warnings a `STAZIONI SCARTATE (n)` block lists each station (or sampling point) not written, with EoI code, the discarded item, station name, municipality, province and **reason**. The same data are in `stazioni_scartate.csv` (separator `;`) in the output folder. Possible reasons:
+**3. Discarded stations.** After the warnings a `DISCARDED STATIONS (n)` block lists each station (or sampling point) not written, with EoI code, the discarded item, station name, municipality, province and **reason**:
 
-| Reason (Italian) | When |
+```
+===== DISCARDED STATIONS (1) =====
+ 1. EoI IT9002A | IT9002Aa | station: TEST | municipality: Example Town | province: Example Province (EP)
+      reason: outside the model grid
+```
+
+The same data are in `discarded_stations.csv` (separator `;`, columns `eoi`, `item`, `station_name`, `municipality`, `province`, `reason`) in the output folder. Possible reasons:
+
+| Reason | When |
 |---|---|
-| `sampling point non presente nel DataExtract.csv` | the parquet's sampling point is not in the metadata |
-| `nessun dato valido nel periodo richiesto` | the file exists but has no valid data in the period (or coverage below `min_coverage`) |
-| `coordinate mancanti nel DataExtract.csv` | lon/lat empty and no other record has them |
-| `fuori dalla griglia del modello` | position outside the NetCDF domain |
-| `a piu' di ... m da ogni comune ISTAT` | position in no ISTAT municipality |
+| `EoI code not in DataExtract.csv` | the station of the parquet is not in the metadata |
+| `no valid data in the requested period` | the file exists but has no valid data in the period |
+| `coverage X% of valid hours, below the Y% threshold` | coverage below `min_coverage` |
+| `coordinates missing in DataExtract.csv` | lon/lat empty and no other record has them |
+| `outside the model grid` | position outside the NetCDF domain |
+| `more than ... m from any ISTAT municipality` | position in no ISTAT municipality |
 
 **Municipality and province.** When the position is known, both come from the ISTAT boundaries (municipality from layer `Com*`, province from layer `ProvCM*`, with name and abbreviation). If the position falls outside every municipality, the municipality is that of `DataExtract.csv` (column `Municipality`) marked `[EEA]`, and the province is `-`. The province layer is **optional**: if missing from the ISTAT zip the province is always `-`. Column names are set with `province_col` (name, `DEN_UTS`; in old editions `DEN_PROV`) and `province_abbr_col` (`SIGLA`).
 
 **4. Errors** stop the script; the text says what is missing. The most common ones:
 
-| Message (Italian, abridged) | Meaning / what to do |
+| Message starts with | What to do |
 |---|---|
-| `Per leggere i file parquet serve il pacchetto 'arrow'` | install `arrow` |
-| `Serve il pacchetto 'sf' ...` | install `sf` |
-| `La cartella dei limiti ISTAT (istat_dir) e' obbligatoria` | create the folder (e.g. `dati/istat`) and set `istat_dir` |
-| `Nessun limite ISTAT in '...'` / `manca il layer Com*` (or `Reg*`) | put the full ISTAT boundaries zip in the folder |
-| `Colonna 'COMUNE' assente nel layer ISTAT` | in that edition the column has another name: set `comune_col` / `region_col` |
-| `Nessun file NetCDF in ...` | wrong `model_dir`, or names different from `model_pattern` |
-| `Nel NetCDF '...' non trovo le dimensioni ...` | grid names differ: set `model_x_dim`, `model_y_dim`, `model_grid` (the message lists those present) |
-| `Nessuna specie con variabile nei NetCDF` | variable names differ from the `farm` column |
-| `Nessun file osservazioni in ...` | wrong `obs_dir` |
-| `Unita' non riconosciuta per ...` | the unit is not mass per m3 (e.g. ppb): set `obs_factor` / `model_factor` |
-| `Nome DELTA non valido` | the `delta` name has spaces or symbols: use only letters and digits |
-| `Il modellato non copre il periodo richiesto` | no hour of `period` is in the FARM files: check `period`, `year`, `tz_offset` |
-| `Nessun dato osservato valido nel periodo richiesto` | no valid data in the period: check `period` and `year` |
+| `The 'arrow' package is required` | `install.packages("arrow")` |
+| `The 'sf' package is required` | `install.packages("sf")` |
+| `The ISTAT boundaries folder (istat_dir) is required` | create the folder (e.g. `data/istat`) and set `istat_dir` |
+| `No ISTAT boundaries in ...` / `... lack the layer Com*` (or `Reg*`) | put the full ISTAT boundaries zip in the folder |
+| `Column 'COMUNE' missing in the ISTAT layer` | in that edition the column has another name: set `comune_col` / `region_col` (the message lists the columns present) |
+| `No NetCDF files in ...` | wrong `model_dir`, or names different from `model_pattern` / `model_version` |
+| `In the NetCDF '...' I cannot find the grid dimensions ...` | grid names differ: set `model_x_dim`, `model_y_dim`, `model_grid` (the message lists those present) |
+| `No species has a variable in the NetCDF files` | variable names differ from the `farm` column (the message lists the variables present) |
+| `No observation files in ...` | wrong `obs_dir` |
+| `Unrecognised unit for ...` | the unit is not mass per m3 (e.g. ppb): set `obs_factor` / `model_factor` |
+| `Invalid DELTA name` | the `delta` name has spaces or symbols: use only letters and digits |
+| `The model does not cover the requested period` | no hour of `period` is in the model files: check `period`, `year`, `tz_offset` |
+| `No valid observed data in the requested period` | no valid data in the period: check `period` and `year` |
 
 ## Notes on the data
 
 - The model may lack some hours at the beginning of the year (e.g. 2023-01-01 00:00-03:00 when the first daily file starts at 04:00): they stay `-999`. `tools/check_model_time.R` lists the hours not covered by the model files.
-- `tools/compare_outputs.R` compares two output folders (each with `obs/` and `mod/`): same file names, pollutant columns matched by name, hours matched by year/month/day/hour. It reports differing hours (above `tol`), hours missing on one side, maximum and mean difference, and writes `confronto_output.csv`. Use `tol = 0.0101` to ignore rounding of half-values.
+- `tools/compare_outputs.R` compares two output folders (each with `obs/` and `mod/`): same file names, pollutant columns matched by name, hours matched by year/month/day/hour. It reports differing hours (above `tol`), hours missing on one side, maximum and mean difference, and writes `comparison_output.csv`. Use `tol = 0.0101` to ignore rounding of half-values.
 
 ## Tests
 
-`Rscript tests/test_synthetic.R` from the repository root: uses only invented data and checks suffixes, time zones, `var` values, cleaned names, ISTAT boundaries, matching, coverage, interpolation and conventions. It needs `ncdf4` and `sf`. By default the synthetic data are temporary; to keep them (input and output) give a new folder: `Rscript tests/test_synthetic.R test_output`. The tests do not replace a check on real data.
+`Rscript tests/test_synthetic.R` from the repository root: uses only invented data and checks suffixes, time zones, `var` values, cleaned names, ISTAT boundaries, matching, coverage, interpolation and conventions. It needs `ncdf4` and `sf` and ends with `OK: all checks passed`. By default the synthetic data are temporary; to keep them (input and output) give a new folder: `Rscript tests/test_synthetic.R test_output`. The tests do not replace a check on real data.
 
 ## License
 

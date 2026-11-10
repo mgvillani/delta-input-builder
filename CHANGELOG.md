@@ -7,8 +7,6 @@ Formato ispirato a [Keep a Changelog](https://keepachangelog.com/it/1.1.0/).
 
 Prima versione pubblica.
 
-README in inglese e in italiano
-
 ### Funzioni
 - Costruzione degli input legacy del DELTA Tool (`startup.ini`, `obs/`, `mod/`) da osservazioni EEA (parquet E1a), `DataExtract.csv`, NetCDF FARM e limiti ISTAT.
 - Abbinamento dei sampling point ai metadati in cascata (SPO, SPP, stessa stazione+codice+metodo, stazione+codice, stazione); valori mancanti completati con quelli degli altri record della stessa stazione.
@@ -22,7 +20,12 @@ README in inglese e in italiano
 - Strumenti: `tools/compare_outputs.R` (confronto tra due cartelle di output) e `tools/check_model_time.R` (ore senza dati del modello).
 - Test su dati sintetici: `tests/test_synthetic.R`.
 
-### Note
+### Language and layout
+- Code comments and all screen messages are in English; the output report files are `discarded_stations.csv` and `warnings.txt` (the comparison tool writes `comparison_output.csv` and `comparison_hours.csv`).
+- The example data folder is `data/` (previously `dati/`).
+- README in English (`README.md`) and Italian (`README.it.md`).
+
+### Notes
 - Specie NOX non supportata da DELTA: esclusa.
 - Senza garanzie e senza supporto (licenza MIT).
 

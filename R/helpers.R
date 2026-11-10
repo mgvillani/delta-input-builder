@@ -1,7 +1,7 @@
-# Funzioni di aiuto per compilare la tabella `pollutants` (non servono per la costruzione).
+# Helper functions to fill in the `pollutants` table (not needed for the build).
 
-# Inquinanti presenti nel DataExtract.csv dell'EEA e quanti sampling point hanno: i nomi
-# della colonna "eea" della tabella pollutants si prendono da qui.
+# Pollutants present in the EEA DataExtract.csv and how many sampling points each has: the
+# names of the "eea" column of the pollutants table are taken from here.
 list_eea_pollutants <- function(meta_csv) {
   raw <- utils::read.csv(meta_csv, encoding = "UTF-8", colClasses = "character",
                          check.names = FALSE, na.strings = "")
@@ -10,8 +10,8 @@ list_eea_pollutants <- function(meta_csv) {
              stringsAsFactors = FALSE)
 }
 
-# Variabili del primo NetCDF del modello, con unita' e dimensioni: i nomi della colonna
-# "farm" della tabella pollutants si prendono da qui.
+# Variables of the first model NetCDF, with units and dimensions: the names of the "farm"
+# column of the pollutants table are taken from here.
 list_model_variables <- function(model_dir, model_pattern, model_version) {
   f <- farm_files(model_dir, model_pattern, model_version)[1]
   nc <- ncdf4::nc_open(f)

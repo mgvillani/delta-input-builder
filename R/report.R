@@ -1,6 +1,6 @@
-# Rapporto finale a schermo: avvisi (warning) e stazioni scartate.
+# Final report on screen: warnings and discarded stations.
 
-# Una riga del registro degli scarti (vettori della stessa lunghezza; NA dove non noto).
+# One row of the discard log (vectors of the same length; NA where unknown).
 .disc_row <- function(eoi, element, name, lon, lat, muni, reason) {
   n <- length(element)
   data.frame(eoi = rep_len(as.character(eoi), n), element = as.character(element),
@@ -9,8 +9,8 @@
              reason = rep_len(as.character(reason), n), stringsAsFactors = FALSE)
 }
 
-# Aggiunge comune e provincia (dai limiti ISTAT, se la posizione e' nota; altrimenti il
-# comune del DataExtract.csv, segnato [EEA]) e ordina le colonne.
+# Adds municipality and province (from the ISTAT boundaries, if the position is known;
+# otherwise the municipality of DataExtract.csv, marked [EEA]) and orders the columns.
 .disc_table <- function(disc, bnd, comune_col, region_col, max_dist_m, province_col, province_abbr_col) {
   if (!length(disc)) return(NULL)
   tab <- do.call(rbind, disc)
@@ -24,32 +24,32 @@
   eea <- ifelse(is.na(tab$muni), NA_character_, paste0(tab$muni, " [EEA]"))
   comune <- ifelse(is.na(comune), eea, comune)
   prov <- if (is.null(geo)) rep(NA_character_, nrow(tab)) else geo$provincia
-  out <- data.frame(eoi = tab$eoi, elemento = tab$element, nome_stazione = tab$name,
-                    comune = comune, provincia = prov, motivo = tab$reason,
+  out <- data.frame(eoi = tab$eoi, item = tab$element, station_name = tab$name,
+                    municipality = comune, province = prov, reason = tab$reason,
                     stringsAsFactors = FALSE)
   out[!duplicated(out), , drop = FALSE]
 }
 
-# Scrive a schermo (message) avvisi e stazioni scartate. Restano interamente nei file
-# di rapporto; a schermo al massimo `max_lines` righe per blocco.
+# Prints (message) warnings and discarded stations. They remain in full in the report
+# files; on screen at most `max_lines` rows per block.
 .print_report <- function(wlog, disc_tab, max_lines = 60L) {
   if (length(wlog)) {
-    message("\n===== AVVISI (", length(wlog), ") =====")
+    message("\n===== WARNINGS (", length(wlog), ") =====")
     shown <- utils::head(wlog, max_lines)
     message(paste0(sprintf("%2d. ", seq_along(shown)), shown, collapse = "\n"))
     if (length(wlog) > max_lines) {
-      message("... e altri ", length(wlog) - max_lines, " avvisi (elenco completo nel file degli avvisi)")
+      message("... and ", length(wlog) - max_lines, " more warnings (full list in the warnings file)")
     }
   }
   if (!is.null(disc_tab) && nrow(disc_tab)) {
-    message("\n===== STAZIONI SCARTATE (", nrow(disc_tab), ") =====")
+    message("\n===== DISCARDED STATIONS (", nrow(disc_tab), ") =====")
     show <- utils::head(disc_tab, max_lines)
     show[is.na(show)] <- "-"
-    message(paste0(sprintf("%2d. EoI %s | %s | stazione: %s | comune: %s | provincia: %s\n      motivo: %s",
-                           seq_len(nrow(show)), show$eoi, show$elemento, show$nome_stazione, show$comune,
-                           show$provincia, show$motivo), collapse = "\n"))
+    message(paste0(sprintf("%2d. EoI %s | %s | station: %s | municipality: %s | province: %s\n      reason: %s",
+                           seq_len(nrow(show)), show$eoi, show$item, show$station_name, show$municipality,
+                           show$province, show$reason), collapse = "\n"))
     if (nrow(disc_tab) > max_lines) {
-      message("... e altre ", nrow(disc_tab) - max_lines, " righe (elenco completo nel file delle stazioni scartate)")
+      message("... and ", nrow(disc_tab) - max_lines, " more rows (full list in the discarded-stations file)")
     }
   }
 }

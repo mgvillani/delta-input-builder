@@ -1,7 +1,7 @@
-# Conversione lon/lat (WGS84) -> UTM, serie di Krueger al 4o ordine.
-# Per FARM sull'Italia i punti griglia sono in UTM fuso 32N "esteso"
-# (meridiano centrale 9 E, easting fino a ~1400 km), quindi lon0 = 9 anche per
-# stazioni fuori dal fuso 32.
+# lon/lat (WGS84) -> UTM conversion, 4th-order Krueger series.
+# For FARM over Italy the grid points are in "extended" UTM zone 32N
+# (central meridian 9 E, easting up to ~1400 km), so lon0 = 9 also for
+# stations outside zone 32.
 lonlat_to_utm <- function(lon, lat, lon0 = 9, k0 = 0.9996, e0 = 500000) {
   a <- 6378137
   f <- 1 / 298.257223563

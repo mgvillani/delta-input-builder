@@ -1,24 +1,24 @@
-# Lettura dei NetCDF FARM (variabili c_NO2, c_O3, ...; dimensioni x,y,z,time;
-# x,y in km UTM; time in "hours since ...").
+# Reading the FARM NetCDF files (variables c_NO2, c_O3, ...; dimensions x,y,z,time;
+# x,y in UTM km; time in "hours since ...").
 
-# `pattern`: espressione regolare sul nome del file. `version`: testo (non regex) che
-# il nome deve contenere, per scegliere una versione/run del modello (es. "g2", "v5").
+# `pattern`: regular expression on the file name. `version`: text (not a regex) the
+# name must contain, to choose a model version/run (e.g. "g2", "v5").
 farm_files <- function(model_dir, pattern, version) {
   f <- sort(list.files(model_dir, pattern = pattern, full.names = TRUE))
   if (!is.null(version) && length(version) == 1 && !is.na(version) && nzchar(version)) {
     f <- f[grepl(version, basename(f), fixed = TRUE)]
   }
   if (!length(f)) {
-    stop("Nessun file NetCDF in ", model_dir, " (pattern ", pattern,
-         if (!is.null(version)) paste0(", versione '", version, "'") else "", ")")
+    stop("No NetCDF files in ", model_dir, " (pattern ", pattern,
+         if (!is.null(version)) paste0(", version '", version, "'") else "", ")")
   }
   f
 }
 
-# Tempo CF ("<unita'> since <origine>", unita' seconds/minutes/hours/days) -> POSIXct UTC.
+# CF time ("<unit> since <origin>", units seconds/minutes/hours/days) -> POSIXct UTC.
 .cf_hours_to_posix <- function(values, units) {
   m <- regmatches(units, regexec("^\\s*(second|minute|hour|day)s?\\s+since\\s+(.*)$", units, ignore.case = TRUE))[[1]]
-  if (length(m) != 3) stop("Unita' del tempo non gestita: ", units)
+  if (length(m) != 3) stop("Time units not handled: ", units)
   mult <- c(second = 1, minute = 60, hour = 3600, day = 86400)[[tolower(m[2])]]
   o <- sub("\\s*(UTC|GMT|Z)?\\s*$", "", trimws(m[3]))
   origin <- NA
@@ -26,32 +26,32 @@ farm_files <- function(model_dir, pattern, version) {
     origin <- as.POSIXct(o, tz = "UTC", format = fmt)
     if (!is.na(origin)) break
   }
-  if (is.na(origin)) stop("Origine del tempo non interpretabile: ", units)
+  if (is.na(origin)) stop("Time origin cannot be interpreted: ", units)
   origin + values * mult
 }
 
-# Coordinate della griglia dal primo file: valori delle dimensioni `x_dim` e `y_dim`
-# (es. "x","y" in km UTM; oppure "lon","lat" in gradi).
+# Grid coordinates from the first file: values of the dimensions `x_dim` and `y_dim`
+# (e.g. "x","y" in UTM km; or "lon","lat" in degrees).
 farm_grid <- function(file, x_dim, y_dim) {
   nc <- ncdf4::nc_open(file)
   on.exit(ncdf4::nc_close(nc))
   if (is.null(nc$dim[[x_dim]]) || is.null(nc$dim[[y_dim]]) ||
       !length(nc$dim[[x_dim]]$vals) || !length(nc$dim[[y_dim]]$vals)) {
-    stop("Nel NetCDF '", basename(file), "' non trovo le dimensioni '", x_dim, "' e '", y_dim,
-         "' della griglia (dimensioni presenti: ", paste(names(nc$dim), collapse = ", "),
-         "): impostale con model_x_dim e model_y_dim")
+    stop("In the NetCDF '", basename(file), "' I cannot find the grid dimensions '", x_dim, "' and '", y_dim,
+         "' (dimensions present: ", paste(names(nc$dim), collapse = ", "),
+         "): set them with model_x_dim and model_y_dim")
   }
   list(x = as.numeric(nc$dim[[x_dim]]$vals), y = as.numeric(nc$dim[[y_dim]]$vals))
 }
 
-# Nomi delle variabili presenti nel file.
+# Names of the variables present in the file.
 farm_varnames <- function(file) {
   nc <- ncdf4::nc_open(file)
   on.exit(ncdf4::nc_close(nc))
   names(nc$var)
 }
 
-# Indice della cella piu' vicina; NA se il punto cade fuori dalla griglia.
+# Index of the nearest cell; NA if the point falls outside the grid.
 nearest_cell <- function(px_km, py_km, gx, gy) {
   half_x <- abs(stats::median(diff(gx))) / 2
   half_y <- abs(stats::median(diff(gy))) / 2
@@ -60,25 +60,25 @@ nearest_cell <- function(px_km, py_km, gx, gy) {
   ix <- near(px_km, gx)
   iy <- near(py_km, gy)
   inside <- abs(gx[ix] - px_km) <= half_x + 1e-9 & abs(gy[iy] - py_km) <= half_y + 1e-9
-  inside[is.na(inside)] <- FALSE   # punto senza coordinate: fuori
+  inside[is.na(inside)] <- FALSE   # point without coordinates: outside
   ix[!inside] <- NA_integer_
   iy[!inside] <- NA_integer_
   list(ix = ix, iy = iy)
 }
 
-# Celle e pesi per ogni punto. `interp`:
-#   "nearest"  : cella con il centro piu' vicino (peso 1);
-#   "bilinear" : interpolazione bilineare tra i centri delle 4 celle che circondano il punto
-#                (come raster::extract(..., method = "bilinear")). Un punto tra l'ultimo centro e
-#                il bordo della griglia (entro mezza cella) usa le celle del bordo (peso fisso).
-# Ritorna ix0, ix1, iy0, iy1 (indici delle 2 celle per asse) e wx, wy (peso della seconda).
+# Cells and weights for each point. `interp`:
+#   "nearest"  : cell with the nearest centre (weight 1);
+#   "bilinear" : bilinear interpolation among the centres of the 4 cells around the point
+#                (as raster::extract(..., method = "bilinear")). A point between the last centre and
+#                the grid edge (within half a cell) uses the edge cells (fixed weight).
+# Returns ix0, ix1, iy0, iy1 (indices of the 2 cells per axis) and wx, wy (weight of the second).
 interp_cells <- function(px, py, gx, gy, interp) {
   n <- length(px)
   if (identical(interp, "nearest")) {
     nc <- nearest_cell(px, py, gx, gy)
     return(list(ix0 = nc$ix, ix1 = nc$ix, iy0 = nc$iy, iy1 = nc$iy, wx = rep(0, n), wy = rep(0, n)))
   }
-  if (!identical(interp, "bilinear")) stop("model_interp deve essere \"nearest\" o \"bilinear\"")
+  if (!identical(interp, "bilinear")) stop("model_interp must be \"nearest\" or \"bilinear\"")
   axis <- function(p, g) {
     o <- order(g); gs <- g[o]
     k <- findInterval(p, gs, all.inside = TRUE)
@@ -89,17 +89,17 @@ interp_cells <- function(px, py, gx, gy, interp) {
   list(ix0 = ax$i0, ix1 = ax$i1, iy0 = ay$i0, iy1 = ay$i1, wx = ax$w, wy = ay$w)
 }
 
-# Serie temporali nelle celle indicate. Ritorna
-#   $time : POSIXct UTC (senza duplicati; per le ore ripetute tra file
-#           consecutivi, es. 00 del giorno dopo, vince il file piu' recente)
-#   $data : lista per inquinante di matrici [tempo x stazione]
-#   $time e' il tempo scritto nei file (vedi model_tz_offset in build.R).
-# `vars`: vettore con nomi = inquinante DELTA, valori = variabile NetCDF.
-# `out_units`, `factors`: per inquinante (stessi nomi di `vars`), unita' di uscita e fattore
-# manuale (NA = si ricava dall'attributo "units" della variabile NetCDF).
-# `cells`: lista di interp_cells() (celle e pesi per stazione).
-# `x_dim`, `y_dim`, `time_dim`: nomi delle dimensioni; l'ordine delle dimensioni della
-# variabile non conta (le altre, es. la quota, sono ridotte al primo livello).
+# Time series in the given cells. Returns
+#   $time : POSIXct UTC (no duplicates; for hours repeated between consecutive
+#           files, e.g. 00 of the next day, the most recent file wins)
+#   $data : list per pollutant of [time x station] matrices
+#   $time is the time written to the files (see model_tz_offset in build.R).
+# `vars`: vector with names = DELTA pollutant, values = NetCDF variable.
+# `out_units`, `factors`: per pollutant (same names as `vars`), output unit and manual
+# factor (NA = derived from the "units" attribute of the NetCDF variable).
+# `cells`: output of interp_cells() (cells and weights per station).
+# `x_dim`, `y_dim`, `time_dim`: dimension names; the order of the variable's dimensions
+# does not matter (the others, e.g. height, are reduced to the first level).
 read_farm_series <- function(model_dir, cells, vars, pattern, version, x_dim, y_dim, time_dim,
                              out_units, factors) {
   files <- farm_files(model_dir, pattern, version)
@@ -111,8 +111,8 @@ read_farm_series <- function(model_dir, cells, vars, pattern, version, x_dim, y_
   for (k in seq_along(files)) {
     nc <- ncdf4::nc_open(files[k])
     if (is.null(nc$dim[[time_dim]])) {
-      stop("Nel NetCDF '", basename(files[k]), "' manca la dimensione tempo '", time_dim,
-           "' (presenti: ", paste(names(nc$dim), collapse = ", "), "): impostala con model_time_dim")
+      stop("The NetCDF '", basename(files[k]), "' has no time dimension '", time_dim,
+           "' (present: ", paste(names(nc$dim), collapse = ", "), "): set it with model_time_dim")
     }
     tm <- .cf_hours_to_posix(as.numeric(nc$dim[[time_dim]]$vals), nc$dim[[time_dim]]$units)
     times[[k]] <- tm
@@ -120,31 +120,31 @@ read_farm_series <- function(model_dir, cells, vars, pattern, version, x_dim, y_
       dn <- vapply(nc$var[[vars[[p]]]]$dim, function(d) d$name, character(1))
       need <- c(x_dim, y_dim, time_dim)
       if (!all(need %in% dn)) {
-        stop("La variabile '", vars[[p]], "' non ha le dimensioni ", paste(need, collapse = ", "),
-             " (ha: ", paste(dn, collapse = ", "), ")")
+        stop("The variable '", vars[[p]], "' does not have the dimensions ", paste(need, collapse = ", "),
+             " (it has: ", paste(dn, collapse = ", "), ")")
       }
       u <- ncdf4::ncatt_get(nc, vars[[p]], "units")
       unit_in <- if (u$hasatt) as.character(u$value) else NA_character_
       if (is.na(unit_in) && is.na(factors[[p]])) {
-        stop("La variabile '", vars[[p]], "' non ha l'attributo 'units': scrivi model_factor per ", p,
-             " nella tabella pollutants")
+        stop("The variable '", vars[[p]], "' has no 'units' attribute: write model_factor for ", p,
+             " in the pollutants table")
       }
-      fac <- unit_factor(unit_in, out_units[[p]], factors[[p]], paste0("la variabile '", vars[[p]], "' del modello"))
+      fac <- unit_factor(unit_in, out_units[[p]], factors[[p]], paste0("the model variable '", vars[[p]], "'"))
       units_seen[[p]] <- union(units_seen[[p]], unit_in)
       factor_used[[p]] <- fac[1]
-      a <- ncdf4::ncvar_get(nc, vars[[p]], collapse_degen = FALSE)   # tiene anche le dimensioni di lunghezza 1
+      a <- ncdf4::ncvar_get(nc, vars[[p]], collapse_degen = FALSE)   # also keeps length-1 dimensions
       d <- dim(a)
       if (is.null(d)) d <- length(a)
       a <- array(a, dim = d)
       a <- aperm(a, c(match(need, dn), setdiff(seq_along(dn), match(need, dn))))
-      a <- array(a, dim = dim(a)[1:3])           # elimina le altre dimensioni (primo livello)
+      a <- array(a, dim = dim(a)[1:3])           # drops the other dimensions (first level)
       val_at <- function(s) {
         w <- c((1 - cells$wx[s]) * (1 - cells$wy[s]), cells$wx[s] * (1 - cells$wy[s]),
                (1 - cells$wx[s]) * cells$wy[s], cells$wx[s] * cells$wy[s])
         ii <- c(cells$ix0[s], cells$ix1[s], cells$ix0[s], cells$ix1[s])
         jj <- c(cells$iy0[s], cells$iy0[s], cells$iy1[s], cells$iy1[s])
         out <- 0
-        for (q in which(w > 0)) out <- out + w[q] * a[ii[q], jj[q], ]   # un NA nelle celle usate da' NA
+        for (q in which(w > 0)) out <- out + w[q] * a[ii[q], jj[q], ]   # an NA in the cells used gives NA
         out
       }
       vals[[p]][[k]] <- fac[1] * vapply(seq_along(cells$ix0), val_at, numeric(length(tm)))
@@ -153,13 +153,13 @@ read_farm_series <- function(model_dir, cells, vars, pattern, version, x_dim, y_
     ncdf4::nc_close(nc)
   }
   time <- do.call(c, times)
-  # File consecutivi condividono al piu' un'ora (la 00 del giorno dopo): molte ore ripetute
-  # vuol dire che nella cartella ci sono piu' versioni/run dello stesso periodo.
+  # Consecutive files share at most one hour (00 of the next day): many repeated hours
+  # mean the folder holds several versions/runs of the same period.
   if (sum(duplicated(as.numeric(time))) > length(files)) {
-    warning("Molte ore compaiono in piu' file (", sum(duplicated(as.numeric(time))),
-            " duplicati su ", length(files), " file): probabilmente ci sono piu' versioni del modello ",
-            "nella cartella; vince l'ultimo file in ordine di nome. Usa model_version o model_pattern ",
-            "per sceglierne una.", call. = FALSE)
+    warning("Many hours appear in several files (", sum(duplicated(as.numeric(time))),
+            " duplicates over ", length(files), " files): there are probably several model versions ",
+            "in the folder; the last file in name order wins. Use model_version or model_pattern ",
+            "to choose one.", call. = FALSE)
   }
   keep <- !duplicated(as.numeric(time), fromLast = TRUE)
   data <- lapply(vals, function(l) do.call(rbind, l)[keep, , drop = FALSE])

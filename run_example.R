@@ -1,54 +1,54 @@
-# Esempio d'uso. QUI, E SOLO QUI, si impostano tutti i parametri: le funzioni in R/
-# non hanno valori predefiniti nascosti per nomi di file, cartelle, fusi o tabelle.
-# Adatta i valori alla tua esecuzione (i dati non sono inclusi nel repository).
+# Usage example. HERE, AND ONLY HERE, all the parameters are set: the functions in R/
+# have no hidden default values for file names, folders, time zones or tables.
+# Adapt the values to your run (the data are not included in the repository).
 #
-# Lancia lo script dalla cartella principale del progetto (quella con R/ dentro).
+# Run the script from the main folder of the project (the one containing R/).
 if (!file.exists("R/build.R")) {
-  stop("Lancia lo script dalla cartella principale del progetto (quella che contiene ",
-       "la cartella R/ e questo file). Cartella attuale: ", getwd())
+  stop("Run the script from the main folder of the project (the one containing ",
+       "the R/ folder and this file). Current folder: ", getwd())
 }
 for (f in list.files("R", pattern = "\\.R$", full.names = TRUE)) source(f)
 
-## ============================== PARAMETRI ====================================
+## ============================== PARAMETERS ===================================
 
-## --- Osservazioni EEA
-obs_dir     <- "dati/eea_parquet"            # un file per sampling point
-obs_pattern <- "\\.parquet$"                 # regex sul nome dei file di osservazioni
-meta_csv    <- "dati/DataExtract.csv"        # metadati stazioni EEA
+## --- EEA observations
+obs_dir     <- "data/eea_parquet"            # one file per sampling point
+obs_pattern <- "\\.parquet$"                 # regex on the observation file names
+meta_csv    <- "data/DataExtract.csv"        # EEA station metadata
 
-## --- Modello (file di concentrazione)
-model_dir     <- "dati/farm"                 # cartella dei NetCDF
-model_pattern <- "^conc_.*\\.nc$"            # regex sul nome dei file da leggere (FARM: "^FARM_conc_.*\\.nc$")
-model_version <- NULL                        # es. "g2": testo che il nome deve contenere; NULL = nessun filtro
-# Griglia del modello: "utm" (x,y in km UTM, come FARM) oppure "lonlat" (gradi)
+## --- Model (concentration files)
+model_dir     <- "data/farm"                 # folder of the NetCDF files
+model_pattern <- "^conc_.*\\.nc$"            # regex on the file names to read (FARM: "^FARM_conc_.*\\.nc$")
+model_version <- NULL                        # e.g. "g2": text the name must contain; NULL = no filter
+# Model grid: "utm" (x,y in UTM km, as FARM) or "lonlat" (degrees)
 model_grid     <- "lonlat"
-model_x_dim    <- "lon"                      # nome della dimensione x nei NetCDF ("x" per FARM UTM)
-model_y_dim    <- "lat"                      # nome della dimensione y ("y" per FARM UTM)
+model_x_dim    <- "lon"                      # name of the x dimension in the NetCDF files ("x" for FARM UTM)
+model_y_dim    <- "lat"                      # name of the y dimension ("y" for FARM UTM)
 model_time_dim <- "time"
-model_interp   <- "bilinear"                 # dal modello alla stazione: "nearest" = cella piu' vicina; "bilinear" = interpolazione
-                                             # bilineare tra le 4 celle intorno (come raster::extract(method = "bilinear"))
-utm_lon0       <- 9                          # solo model_grid = "utm": meridiano centrale (9 per FARM)
+model_interp   <- "bilinear"                 # from model to station: "nearest" = nearest cell; "bilinear" = bilinear
+                                             # interpolation among the 4 surrounding cells (as raster::extract(method = "bilinear"))
+utm_lon0       <- 9                          # only model_grid = "utm": central meridian (9 for FARM)
 
-## --- Limiti amministrativi ISTAT (OBBLIGATORI): uno zip per anno nella stessa cartella
-istat_dir        <- "dati/istat"
-istat_year       <- NULL                     # NULL = usa l'edizione dell'anno `year`
-istat_max_dist_m <- 2000                     # stazioni fuori dai comuni: entro questa distanza (m) o scartate
-comune_col       <- "COMUNE"                 # colonna ISTAT con il nome del comune
-region_col       <- "DEN_REG"                # colonna ISTAT con il nome della regione
-province_col      <- "DEN_UTS"               # layer ProvCM*: nome della provincia (edizioni vecchie: "DEN_PROV"); solo per il rapporto delle stazioni scartate
-province_abbr_col <- "SIGLA"                 # layer ProvCM*: sigla della provincia
+## --- ISTAT administrative boundaries (REQUIRED): one zip per year in the same folder
+istat_dir        <- "data/istat"
+istat_year       <- NULL                     # NULL = use the edition of `year`
+istat_max_dist_m <- 2000                     # stations outside the municipalities: within this distance (m) or dropped
+comune_col       <- "COMUNE"                 # ISTAT column with the municipality name
+region_col       <- "DEN_REG"                # ISTAT column with the region name
+province_col      <- "DEN_UTS"               # ProvCM* layer: province name (old editions: "DEN_PROV"); only for the discarded-stations report
+province_abbr_col <- "SIGLA"                 # ProvCM* layer: province abbreviation
 
-## --- Inquinanti: UNA RIGA PER SPECIE, tutte quelle che vuoi preparare
-##   delta  nome scritto nello startup e nei CSV (solo lettere e cifre; niente spazi, '_', ';', '*', '.')
-##   eea    nome nella colonna "Air Pollutant" del DataExtract.csv (list_eea_pollutants(meta_csv) li elenca)
-##   farm   nome della variabile nel NetCDF del modello (list_model_variables(...) le elenca con le unita')
-##   type   GAS oppure PM
-##   unit   unita' di USCITA (quella nello startup); osservazioni e modello vengono convertite in questa
-##   obs_factor, model_factor  (facoltative) fattore a mano; NA = conversione automatica dalle unita'
-##                  ("Unit" dei parquet EEA, attributo "units" del NetCDF). Servono per ppb, mol/mol, ...
-## Specie qui sotto: SO2, CO, NOX, NO2, O3, PM10, PM2.5, Pb, As, BaP, Cd, Ni, C6H6.
-## DA VERIFICARE: la colonna `farm` (nomi delle variabili nei tuoi NetCDF: list_model_variables(...)),
-## le unita' di uscita (CO in mg/m3 e metalli/BaP in ng/m3 e' una scelta mia) e il tipo GAS/PM dei metalli.
+## --- Pollutants: ONE ROW PER SPECIES, all the ones you may want to prepare
+##   delta  name written in the startup and in the CSV files (letters and digits only; no spaces, '_', ';', '*', '.')
+##   eea    name in the "Air Pollutant" column of DataExtract.csv (list_eea_pollutants(meta_csv) lists them)
+##   farm   name of the variable in the model NetCDF (list_model_variables(...) lists them with their units)
+##   type   GAS or PM
+##   unit   OUTPUT unit (the one in the startup); observations and model are converted to it
+##   obs_factor, model_factor  (optional) manual factor; NA = automatic conversion from the units
+##                  ("Unit" of the EEA parquet files, "units" attribute of the NetCDF). Needed for ppb, mol/mol, ...
+## Species below: SO2, CO, NOX, NO2, O3, PM10, PM2.5, Pb, As, BaP, Cd, Ni, C6H6.
+## TO CHECK: the `farm` column (variable names in your NetCDF files: list_model_variables(...)),
+## the output units (CO in mg/m3 and As/BaP/Cd in ng/m3 are a choice made here) and the GAS/PM type of the metals.
 pollutants <- data.frame(
   delta = c("SO2",   "CO",    "NOX",        "NO2",   "O3",   "PM10",  "PM25",  "Pb",          "As",          "BaP",          "Cd",          "Ni",          "C6H6"),
   eea   = c("SO2",   "CO",    "NOX as NO2", "NO2",   "O3",   "PM10",  "PM2.5", "Pb in PM10",  "As in PM10",  "BaP in PM10",  "Cd in PM10",  "Ni in PM10",  "C6H6"),
@@ -60,39 +60,39 @@ pollutants <- data.frame(
   stringsAsFactors = FALSE
 )
 
-## Selezione: quali specie della tabella preparare in questa esecuzione (nomi della colonna `delta`).
-## NULL = tutte. NOX e' nella tabella ma DELTA online NON lo riconosce (KeyError 'NOX' al caricamento),
-## quindi per l'input DELTA va escluso con questa selezione.
+## Selection: which species of the table to prepare in this run (names of the `delta` column).
+## NULL = all. NOX is in the table but DELTA online does NOT recognise it (KeyError 'NOX' on upload),
+## so for the DELTA input it must be excluded with this selection.
 species <- c("SO2", "CO", "NO2", "O3", "PM10", "PM25", "Pb", "As", "BaP", "Cd", "Ni", "C6H6")
 
-## --- Uscita e periodo
-out_dir      <- "output"                     # cartella base
-out_label    <- NULL                         # sottocartella: NULL = "<anno>[_<model_version>][_<specie>][_<periodo>]"; "" = scrivi in out_dir
-                                             # startup.ini, obs/ e mod/ finiscono in out_dir/out_label/
+## --- Output and period
+out_dir      <- "output"                     # base folder
+out_label    <- NULL                         # subfolder: NULL = "<year>[_<model_version>][_<species>][_<period>]"; "" = write in out_dir
+                                             # startup.ini, obs/ and mod/ end up in out_dir/out_label/
 startup_name <- "startup.ini"
-discarded_name <- "stazioni_scartate.csv"    # rapporto delle stazioni scartate (EoI, comune, provincia, motivo)
-warnings_name  <- "avvisi.txt"               # tutti gli avvisi, per esteso
+discarded_name <- "discarded_stations.csv"   # report of the discarded stations (EoI, municipality, province, reason)
+warnings_name  <- "warnings.txt"             # all the warnings, in full
 year         <- 2023
-# period     <- NULL                         # NULL = anno intero
-period       <- c(as.POSIXct("2023-01-01 00:00", tz = "UTC"),    # test rapido su 2 giorni
+# period     <- NULL                         # NULL = whole year
+period       <- c(as.POSIXct("2023-01-01 00:00", tz = "UTC"),    # quick test on 2 days
                   as.POSIXct("2023-01-02 23:00", tz = "UTC"))
-scale        <- "urban"                      # [MODEL] Scale nello startup
-valid_codes  <- c(1L)                        # codici "Validity" EEA accettati: 1 = solo valido; c(1L, 2L, 3L) include
-                                             # anche i validi sotto il limite di rilevabilita' (2 e 3)
-min_coverage <- 0.75                         # copertura minima: frazione di ore valide nel periodo per ogni
-                                             # sampling point (stazione + inquinante); sotto soglia e' scartato
-eol          <- "\n"                         # fine riga dei file scritti
+scale        <- "urban"                      # [MODEL] Scale in the startup
+valid_codes  <- c(1L)                        # accepted EEA "Validity" codes: 1 = valid only; c(1L, 2L, 3L) also includes
+                                             # data valid below the detection limit (2 and 3)
+min_coverage <- 0.75                         # minimum coverage: fraction of valid hours in the period for each
+                                             # sampling point (station + pollutant); below the threshold it is dropped
+eol          <- "\n"                         # line ending of the written files
 
-## --- Fusi orari (ore rispetto a UTC: 1 = UTC+1, 0 = UTC)
-tz_offset       <- 1                         # fuso di TUTTI i file in uscita
-obs_tz_offset   <- NULL                      # NULL = dalla colonna Timezone dei metadati EEA
-model_tz_offset <- 1                         # fuso dei tempi nei NetCDF del modello
-gmt_lag         <- NULL                      # NULL = "UTC" se tz_offset = 0, altrimenti "UTC+1", ...
-obs_hour_label  <- "end"                     # ora a cui va il dato orario delle osservazioni: "start" = inizio ora (PMSS);
-                                             # "end" = fine ora (FARM: tempi = istanti a fine ora). Obs e modello devono avere la stessa convenzione
-model_shift_h   <- 0                         # ore da sommare al tempo di griglia (convenzione oraria)
+## --- Time zones (hours from UTC: 1 = UTC+1, 0 = UTC)
+tz_offset       <- 1                         # time zone of ALL the output files
+obs_tz_offset   <- NULL                      # NULL = from the Timezone column of the EEA metadata
+model_tz_offset <- 1                         # time zone of the times in the model NetCDF files
+gmt_lag         <- NULL                      # NULL = "UTC" if tz_offset = 0, otherwise "UTC+1", ...
+obs_hour_label  <- "end"                     # hour to which an hourly observation goes: "start" = start of the hour (PMSS);
+                                             # "end" = end of the hour (FARM: times = end-of-hour instants). Obs and model must use the same convention
+model_shift_h   <- 0                         # hours added to the grid time (hour convention)
 
-## =============================== ESECUZIONE ==================================
+## =============================== EXECUTION ===================================
 
 res <- build_delta_inputs(
   obs_dir = obs_dir, obs_pattern = obs_pattern, meta_csv = meta_csv,
